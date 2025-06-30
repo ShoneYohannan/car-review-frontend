@@ -1,0 +1,255 @@
+import { useState, useEffect } from 'react'
+import './App.css'
+
+const API_BASE_URL = 'http://localhost:5000/api';
+
+// Star Rating Component
+const StarRating = ({ rating, onRatingChange, readonly = false }) => {
+  const [hover, setHover] = useState(0);
+
+  return (
+    <div className="star-rating">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <span
+          key={star}
+          className={`star ${star <= (hover || rating) ? 'filled' : ''} ${readonly ? 'readonly' : ''}`}
+          onClick={() => !readonly && onRatingChange(star)}
+          onMouseEnter={() => !readonly && setHover(star)}
+          onMouseLeave={() => !readonly && setHover(0)}
+        >
+          ★
+        </span>
+      ))}
+    </div>
+  );
+};
+
+function App() {
+  const [reviews, setReviews] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [formData, setFormData] = useState({
+    userName: '',
+    carName: '',
+    carBrand: '',
+    rating: 5,
+    review: ''
+  })
+
+  // Fetch reviews from API
+  const fetchReviews = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch(`${API_BASE_URL}/reviews`)
+      if (!response.ok) {
+        throw new Error('Failed to fetch reviews')
+      }
+      const data = await response.json()
+      setReviews(data)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Load reviews on component mount
+  useEffect(() => {
+    fetchReviews()
+  }, [])
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }))
+  }
+
+  const handleRatingChange = (rating) => {
+    setFormData(prev => ({
+      ...prev,
+      rating
+    }))
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (formData.userName && formData.carName && formData.carBrand) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/reviews`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(formData)
+        })
+
+        if (!response.ok) {
+          throw new Error('Failed to create review')
+        }
+
+        const newReview = await response.json()
+        setReviews(prev => [newReview, ...prev])
+        setFormData({
+          userName: '',
+          carName: '',
+          carBrand: '',
+          rating: 5,
+          review: ''
+        })
+        setError(null)
+      } catch (err) {
+        setError(err.message)
+      }
+    }
+  }
+
+  const deleteReview = async (id) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/reviews/${id}`, {
+        method: 'DELETE'
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete review')
+      }
+
+      setReviews(prev => prev.filter(review => review._id !== id))
+      setError(null)
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString()
+  }
+
+  return (
+    <div className="app">
+      <header className="header">
+        <h1 className="site-title">
+          <span className="title-main">Car<span className="highlight">Star</span> Reviews</span>
+          <span className="title-emoji"> 🚗✨</span>
+        </h1>
+        <p className="subtitle">Find, rate, and share your car experiences with the world!</p>
+      </header>
+
+      {error && (
+        <div className="error-message">
+          Error: {error}
+        </div>
+      )}
+
+      <main className="main">
+        <section className="form-section">
+          <h2>Add Your Review</h2>
+          <form onSubmit={handleSubmit} className="review-form">
+            <div className="form-group">
+              <label htmlFor="userName">Your Name:</label>
+              <input
+                type="text"
+                id="userName"
+                name="userName"
+                value={formData.userName}
+                onChange={handleInputChange}
+                placeholder="Enter your name"
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="carName">Car Name:</label>
+              <input
+                type="text"
+                id="carName"
+                name="carName"
+                value={formData.carName}
+                onChange={handleInputChange}
+                placeholder="e.g., Civic, Camry, Model 3"
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="carBrand">Car Brand:</label>
+              <input
+                type="text"
+                id="carBrand"
+                name="carBrand"
+                value={formData.carBrand}
+                onChange={handleInputChange}
+                placeholder="e.g., Honda, Toyota, Tesla"
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Rating:</label>
+              <StarRating 
+                rating={formData.rating} 
+                onRatingChange={handleRatingChange}
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="review">Review:</label>
+              <textarea
+                id="review"
+                name="review"
+                value={formData.review}
+                onChange={handleInputChange}
+                placeholder="Share your experience with this car..."
+                rows="4"
+              />
+            </div>
+
+            <button type="submit" className="submit-btn">
+              Submit Review
+            </button>
+          </form>
+        </section>
+
+        <section className="reviews-section">
+          <h2>Recent Reviews ({reviews.length})</h2>
+          {loading ? (
+            <div className="loading">Loading reviews...</div>
+          ) : reviews.length === 0 ? (
+            <p className="no-reviews">No reviews yet. Be the first to share!</p>
+          ) : (
+            <div className="reviews-grid">
+              {reviews.map(review => (
+                <div key={review._id} className="review-card">
+                  <div className="review-header">
+                    <h3>{review.carName}</h3>
+                    <span className="brand">{review.carBrand}</span>
+                  </div>
+                  <div className="review-rating">
+                    <StarRating rating={review.rating} readonly={true} />
+                    <span className="rating-text">{review.rating}/5</span>
+                  </div>
+                  <p className="reviewer">By: {review.userName}</p>
+                  {review.review && (
+                    <p className="review-text">{review.review}</p>
+                  )}
+                  <div className="review-footer">
+                    <span className="date">{formatDate(review.date)}</span>
+                    <button 
+                      onClick={() => deleteReview(review._id)}
+                      className="delete-btn"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </main>
+    </div>
+  )
+}
+
+export default App
