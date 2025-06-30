@@ -95,6 +95,8 @@ function App() {
     rating: 5,
     review: ''
   })
+  const [search, setSearch] = useState('');
+  const [ratingFilter, setRatingFilter] = useState(0);
 
   // Collect unique car brands from reviews and merge with popular brands
   const allBrands = [
@@ -216,6 +218,20 @@ function App() {
   const reviewsByBrand = groupReviewsByBrand(reviews);
   const brandNames = Object.keys(reviewsByBrand).sort();
 
+  // Filter brands and reviews by search and rating
+  const filteredBrandNames = brandNames.filter(brand =>
+    brand.toLowerCase().includes(search.toLowerCase())
+  );
+  const filteredReviewsByBrand = {};
+  filteredBrandNames.forEach(brand => {
+    filteredReviewsByBrand[brand] = reviewsByBrand[brand].filter(
+      review =>
+        (review.carName.toLowerCase().includes(search.toLowerCase()) ||
+         review.carBrand.toLowerCase().includes(search.toLowerCase())) &&
+        (ratingFilter === 0 || review.rating >= ratingFilter)
+    );
+  });
+
   return (
     <div className="app">
       <header className="header">
@@ -317,6 +333,39 @@ function App() {
         </section>
 
         <section className="reviews-section">
+          <div className="search-bar-container">
+            <span className="search-icon">🔍</span>
+            <input
+              type="text"
+              className="search-bar"
+              placeholder="Search by brand or car name..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="rating-filter-container">
+            <span className="filter-label">Filter by rating:</span>
+            <div className="rating-filter-stars">
+              {[5, 4, 3, 2, 1].map(star => (
+                <span
+                  key={star}
+                  className={`star-filter ${ratingFilter === star ? 'selected' : ''}`}
+                  onClick={() => setRatingFilter(star)}
+                  title={`Show reviews with ${star} stars or more`}
+                >
+                  ★
+                </span>
+              ))}
+              <button
+                className="clear-rating-filter"
+                onClick={() => setRatingFilter(0)}
+                title="Clear rating filter"
+                style={{ marginLeft: 8 }}
+              >
+                Clear
+              </button>
+            </div>
+          </div>
           <h2>Recent Reviews ({reviews.length})</h2>
           {loading ? (
             <div className="loading">Loading reviews...</div>
@@ -324,41 +373,45 @@ function App() {
             <p className="no-reviews">No reviews yet. Be the first to share!</p>
           ) : (
             <div className="reviews-by-brand">
-              {brandNames.map((brand) => (
-                <div key={brand} className="brand-section">
-                  <h3 className="brand-title">{brand}</h3>
-                  <div className="reviews-grid">
-                    {reviewsByBrand[brand].map((review) => (
-                      <div key={review._id} className="review-card">
-                        <div className="review-header">
-                          <div className="brand-row">
-                            <span className="brand-icon">{getBrandIcon(review.carBrand)}</span>
-                            <span className="brand">{review.carBrand}</span>
+              {filteredBrandNames.length === 0 ? (
+                <p className="no-reviews">No matching brands or reviews found.</p>
+              ) : (
+                filteredBrandNames.map((brand) => (
+                  <div key={brand} className="brand-section">
+                    <h3 className="brand-title">{brand}</h3>
+                    <div className="reviews-grid">
+                      {filteredReviewsByBrand[brand].map((review) => (
+                        <div key={review._id} className="review-card">
+                          <div className="review-header">
+                            <div className="brand-row">
+                              <span className="brand-icon">{getBrandIcon(review.carBrand)}</span>
+                              <span className="brand">{review.carBrand}</span>
+                            </div>
+                            <h3>{review.carName}</h3>
                           </div>
-                          <h3>{review.carName}</h3>
+                          <div className="review-rating">
+                            <StarRating rating={review.rating} readonly={true} />
+                            <span className="rating-text">{review.rating}/5</span>
+                          </div>
+                          <p className="reviewer">By: {review.userName}</p>
+                          {review.review && (
+                            <p className="review-text">{review.review}</p>
+                          )}
+                          <div className="review-footer">
+                            <span className="date">{formatDate(review.date)}</span>
+                            <button 
+                              onClick={() => deleteReview(review._id)}
+                              className="delete-btn"
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </div>
-                        <div className="review-rating">
-                          <StarRating rating={review.rating} readonly={true} />
-                          <span className="rating-text">{review.rating}/5</span>
-                        </div>
-                        <p className="reviewer">By: {review.userName}</p>
-                        {review.review && (
-                          <p className="review-text">{review.review}</p>
-                        )}
-                        <div className="review-footer">
-                          <span className="date">{formatDate(review.date)}</span>
-                          <button 
-                            onClick={() => deleteReview(review._id)}
-                            className="delete-btn"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           )}
         </section>
