@@ -3,6 +3,56 @@ import './App.css'
 
 const API_BASE_URL = 'http://localhost:5000/api';
 
+const TOP_BRANDS = ['Toyota', 'BMW', 'Mercedes-Benz', 'Tesla', 'Hyundai'];
+const POPULAR_BRANDS = [
+  'Toyota', 'Honda', 'Ford', 'Chevrolet', 'BMW', 'Mercedes-Benz', 'Audi', 'Volkswagen',
+  'Hyundai', 'Kia', 'Nissan', 'Mazda', 'Subaru', 'Lexus', 'Jeep', 'Tesla', 'Porsche',
+  'Jaguar', 'Land Rover', 'Volvo', 'Renault', 'Peugeot', 'Fiat', 'Skoda', 'Suzuki',
+  'Mitsubishi', 'Mini', 'Dodge', 'Ram', 'Genesis', 'BYD', 'MG', 'Tata', 'Mahindra', 'Citroën'
+];
+
+const BRAND_ICONS = {
+  'Toyota': '🚗',
+  'BMW': '🚙',
+  'Mercedes-Benz': '🚘',
+  'Tesla': '⚡',
+  'Hyundai': '🚐',
+  'Honda': '🚕',
+  'Ford': '🚚',
+  'Chevrolet': '🚙',
+  'Audi': '🚗',
+  'Volkswagen': '🚙',
+  'Kia': '🚗',
+  'Nissan': '🚙',
+  'Mazda': '🚗',
+  'Subaru': '🚙',
+  'Lexus': '🚘',
+  'Jeep': '🚙',
+  'Porsche': '🏎️',
+  'Jaguar': '🐆',
+  'Land Rover': '🚙',
+  'Volvo': '🚗',
+  'Renault': '🚗',
+  'Peugeot': '🚗',
+  'Fiat': '🚗',
+  'Skoda': '🚗',
+  'Suzuki': '🚗',
+  'Mitsubishi': '🚗',
+  'Mini': '🚗',
+  'Dodge': '🚙',
+  'Ram': '🚚',
+  'Genesis': '🚗',
+  'BYD': '🔋',
+  'MG': '🚗',
+  'Tata': '🚗',
+  'Mahindra': '🚙',
+  'Citroën': '🚗',
+};
+
+function getBrandIcon(brand) {
+  return BRAND_ICONS[brand] || '🚗';
+}
+
 // Star Rating Component
 const StarRating = ({ rating, onRatingChange, readonly = false }) => {
   const [hover, setHover] = useState(0);
@@ -24,6 +74,16 @@ const StarRating = ({ rating, onRatingChange, readonly = false }) => {
   );
 };
 
+function groupReviewsByBrand(reviews) {
+  const grouped = {};
+  reviews.forEach((review) => {
+    const brand = review.carBrand.trim();
+    if (!grouped[brand]) grouped[brand] = [];
+    grouped[brand].push(review);
+  });
+  return grouped;
+}
+
 function App() {
   const [reviews, setReviews] = useState([])
   const [loading, setLoading] = useState(true)
@@ -35,6 +95,16 @@ function App() {
     rating: 5,
     review: ''
   })
+
+  // Collect unique car brands from reviews and merge with popular brands
+  const allBrands = [
+    ...TOP_BRANDS,
+    ...POPULAR_BRANDS,
+    ...reviews.map(r => r.carBrand.trim()).filter(Boolean)
+  ];
+  const uniqueBrands = Array.from(new Set(allBrands)).filter(Boolean);
+  const [customBrand, setCustomBrand] = useState('');
+  const [useCustomBrand, setUseCustomBrand] = useState(false);
 
   // Fetch reviews from API
   const fetchReviews = async () => {
@@ -72,6 +142,22 @@ function App() {
       rating
     }))
   }
+
+  const handleBrandChange = (e) => {
+    const value = e.target.value;
+    if (value === '__custom__') {
+      setUseCustomBrand(true);
+      setFormData(prev => ({ ...prev, carBrand: '' }));
+    } else {
+      setUseCustomBrand(false);
+      setFormData(prev => ({ ...prev, carBrand: value }));
+    }
+  };
+
+  const handleCustomBrandChange = (e) => {
+    setCustomBrand(e.target.value);
+    setFormData(prev => ({ ...prev, carBrand: e.target.value }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -126,12 +212,15 @@ function App() {
     return new Date(dateString).toLocaleDateString()
   }
 
+  // Group reviews by car brand
+  const reviewsByBrand = groupReviewsByBrand(reviews);
+  const brandNames = Object.keys(reviewsByBrand).sort();
+
   return (
     <div className="app">
       <header className="header">
         <h1 className="site-title">
-          <span className="title-main">Car<span className="highlight">Star</span> Reviews</span>
-          <span className="title-emoji"> 🚗✨</span>
+          <span className="title-main">CARS <span className="mui-blue">24</span></span>
         </h1>
         <p className="subtitle">Find, rate, and share your car experiences with the world!</p>
       </header>
@@ -174,15 +263,31 @@ function App() {
 
             <div className="form-group">
               <label htmlFor="carBrand">Car Brand:</label>
-              <input
-                type="text"
+              <select
                 id="carBrand"
                 name="carBrand"
-                value={formData.carBrand}
-                onChange={handleInputChange}
-                placeholder="e.g., Honda, Toyota, Tesla"
-                required
-              />
+                value={useCustomBrand ? '__custom__' : formData.carBrand}
+                onChange={handleBrandChange}
+                required={!useCustomBrand}
+              >
+                <option value="" disabled>Select a brand</option>
+                {uniqueBrands.map(brand => (
+                  <option key={brand} value={brand}>{brand}</option>
+                ))}
+                <option value="__custom__">Other (enter manually)</option>
+              </select>
+              {useCustomBrand && (
+                <input
+                  type="text"
+                  id="customBrand"
+                  name="customBrand"
+                  value={customBrand}
+                  onChange={handleCustomBrandChange}
+                  placeholder="Enter car brand"
+                  required
+                  style={{ marginTop: '8px' }}
+                />
+              )}
             </div>
 
             <div className="form-group">
@@ -218,29 +323,39 @@ function App() {
           ) : reviews.length === 0 ? (
             <p className="no-reviews">No reviews yet. Be the first to share!</p>
           ) : (
-            <div className="reviews-grid">
-              {reviews.map(review => (
-                <div key={review._id} className="review-card">
-                  <div className="review-header">
-                    <h3>{review.carName}</h3>
-                    <span className="brand">{review.carBrand}</span>
-                  </div>
-                  <div className="review-rating">
-                    <StarRating rating={review.rating} readonly={true} />
-                    <span className="rating-text">{review.rating}/5</span>
-                  </div>
-                  <p className="reviewer">By: {review.userName}</p>
-                  {review.review && (
-                    <p className="review-text">{review.review}</p>
-                  )}
-                  <div className="review-footer">
-                    <span className="date">{formatDate(review.date)}</span>
-                    <button 
-                      onClick={() => deleteReview(review._id)}
-                      className="delete-btn"
-                    >
-                      Delete
-                    </button>
+            <div className="reviews-by-brand">
+              {brandNames.map((brand) => (
+                <div key={brand} className="brand-section">
+                  <h3 className="brand-title">{brand}</h3>
+                  <div className="reviews-grid">
+                    {reviewsByBrand[brand].map((review) => (
+                      <div key={review._id} className="review-card">
+                        <div className="review-header">
+                          <div className="brand-row">
+                            <span className="brand-icon">{getBrandIcon(review.carBrand)}</span>
+                            <span className="brand">{review.carBrand}</span>
+                          </div>
+                          <h3>{review.carName}</h3>
+                        </div>
+                        <div className="review-rating">
+                          <StarRating rating={review.rating} readonly={true} />
+                          <span className="rating-text">{review.rating}/5</span>
+                        </div>
+                        <p className="reviewer">By: {review.userName}</p>
+                        {review.review && (
+                          <p className="review-text">{review.review}</p>
+                        )}
+                        <div className="review-footer">
+                          <span className="date">{formatDate(review.date)}</span>
+                          <button 
+                            onClick={() => deleteReview(review._id)}
+                            className="delete-btn"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))}
